@@ -5,6 +5,7 @@ const BACKEND_URL = "https://farma-7llj.onrender.com";
 let currentProduct = null;
 let currentSort = "price"; // "price" | "distance" | "delivery"
 let currentCity = "teresina"; // Selected city
+let purchaseMode = "online"; // "online" | "presencial"
 let displayedPrices = []; // List of prices currently displayed to calculate savings
 let quantityMultiplier = 1;
 let recentScans = [];
@@ -210,6 +211,30 @@ function initEventListeners() {
     });
   }
 
+  // Purchase Mode Toggle Buttons
+  const modeOnlineBtn = document.getElementById("mode-online-btn");
+  const modePresencialBtn = document.getElementById("mode-presencial-btn");
+  
+  const setPurchaseMode = (mode) => {
+    purchaseMode = mode;
+    if (mode === "online") {
+      modeOnlineBtn.classList.add("active");
+      modePresencialBtn.classList.remove("active");
+    } else {
+      modeOnlineBtn.classList.remove("active");
+      modePresencialBtn.classList.add("active");
+    }
+    if (currentProduct) {
+      renderComparisonList();
+      updateCalculator();
+    }
+  };
+
+  if (modeOnlineBtn && modePresencialBtn) {
+    modeOnlineBtn.addEventListener("click", () => setPurchaseMode("online"));
+    modePresencialBtn.addEventListener("click", () => setPurchaseMode("presencial"));
+  }
+
   // Auto-focus search input on page load
   const searchInput = document.getElementById("search-input");
   if (searchInput) {
@@ -328,147 +353,172 @@ function renderComparisonList() {
   
   let sortedPrices = [];
 
+  const getBasePriceForQuery = (phDef) => {
+    if (phDef.usesRealPriceOf) {
+      const match = currentProduct.prices.find(p => p.pharmacyId === phDef.usesRealPriceOf);
+      if (match && match.stockStatus === "Disponível") return match.currentPrice;
+    }
+    const direct = currentProduct.prices.find(p => p.pharmacyId === phDef.id);
+    if (direct && direct.stockStatus === "Disponível") return direct.currentPrice;
+    
+    // Generic chain fallback
+    const pmMatch = currentProduct.prices.find(p => p.pharmacyId === "paguemenos");
+    if (pmMatch && pmMatch.stockStatus === "Disponível") return pmMatch.currentPrice;
+    const dspMatch = currentProduct.prices.find(p => p.pharmacyId === "drogariasaopaulo");
+    if (dspMatch && dspMatch.stockStatus === "Disponível") return dspMatch.currentPrice;
+    
+    const firstAvailable = currentProduct.prices.find(p => p.stockStatus === "Disponível");
+    if (firstAvailable) return firstAvailable.currentPrice;
+    return currentProduct.basePrice || 25.00;
+  };
+
+  const getPricesForPharmacy = (ph, isNacional = false) => {
+    let onlinePrice = 0;
+    let originalPrice = 0;
+    let hasDiscount = false;
+    let discountPercent = 0;
+    let stockStatus = "Disponível";
+
+    const realPriceItem = !ph.isSimulated ? currentProduct.prices.find(p => p.pharmacyId === ph.id) : null;
+
+    if (realPriceItem) {
+      onlinePrice = realPriceItem.currentPrice;
+      originalPrice = realPriceItem.originalPrice;
+      hasDiscount = realPriceItem.hasDiscount;
+      discountPercent = realPriceItem.discountPercent;
+      stockStatus = realPriceItem.stockStatus;
+    } else {
+      const base = getBasePriceForQuery(ph);
+      const rand = seedRandom(currentProduct.barcode + ph.id);
+      const factor = ph.priceFactor || 1.0;
+      
+      onlinePrice = parseFloat((base * factor * (0.97 + rand() * 0.05)).toFixed(2));
+      hasDiscount = rand() > 0.45;
+      discountPercent = hasDiscount ? Math.floor(rand() * 20 + 5) : 0;
+      originalPrice = hasDiscount ? parseFloat((onlinePrice * (1 + (discountPercent/100))).toFixed(2)) : onlinePrice;
+      stockStatus = "Disponível";
+    }
+
+    // Calculate deterministic physical store price (usually 3% to 6% markup)
+    const pRand = seedRandom(currentProduct.barcode + ph.id + "_presential");
+    const physicalMarkup = 1.03 + (pRand() * 0.03); // Between 1.03 and 1.06
+    const physicalPrice = parseFloat((onlinePrice * physicalMarkup).toFixed(2));
+
+    // Choose effective price and delivery parameters based on purchaseMode
+    const effectivePrice = purchaseMode === "online" ? onlinePrice : physicalPrice;
+    const effectiveDeliveryFee = purchaseMode === "online" ? ph.deliveryFee : 0;
+
+    return {
+      onlinePrice,
+      physicalPrice,
+      effectivePrice,
+      effectiveDeliveryFee,
+      originalPrice,
+      hasDiscount,
+      discountPercent,
+      stockStatus
+    };
+  };
+
   if (currentCity === "nacional") {
-    // Use raw backend prices mapped to local SVG logs
-    sortedPrices = currentProduct.prices.map(p => {
-      const brand = PHARMACY_BRANDS[p.pharmacyId] || {};
-      return {
-        ...p,
-        logoSvg: brand.logoSvg || p.logoSvg || "",
-        address: "Rede Nacional - Vendas Online"
-      };
+    CITIES_DATABASE.nacional.pharmacies.forEach(ph => {
+      const brand = PHARMACY_BRANDS[ph.id] || {};
+      const prices = getPricesForPharmacy(ph, true);
+      sortedPrices.push({
+        pharmacyId: ph.id,
+        pharmacyName: ph.name,
+        address: "Rede Nacional - Vendas Online",
+        brandColor: brand.brandColor || "#dc2626",
+        logoSvg: brand.logoSvg || "",
+        distance: ph.distance,
+        deliveryFee: ph.deliveryFee,
+        deliveryTime: ph.deliveryTime,
+        buyUrl: `https://www.google.com/search?q=${encodeURIComponent(ph.name + ' ' + currentProduct.name)}`,
+        ...prices
+      });
     });
   } else {
     const cityData = CITIES_DATABASE[currentCity];
     if (cityData) {
-      // Helper to dynamically calculate a base price from real prices for simulated stores
-      const getBasePriceForQuery = (phDef) => {
-        if (phDef.usesRealPriceOf) {
-          const match = currentProduct.prices.find(p => p.pharmacyId === phDef.usesRealPriceOf);
-          if (match && match.stockStatus === "Disponível") return match.currentPrice;
-        }
-        const direct = currentProduct.prices.find(p => p.pharmacyId === phDef.id);
-        if (direct && direct.stockStatus === "Disponível") return direct.currentPrice;
-        
-        // Generic chain fallback
-        const pmMatch = currentProduct.prices.find(p => p.pharmacyId === "paguemenos");
-        if (pmMatch && pmMatch.stockStatus === "Disponível") return pmMatch.currentPrice;
-        const dspMatch = currentProduct.prices.find(p => p.pharmacyId === "drogariasaopaulo");
-        if (dspMatch && dspMatch.stockStatus === "Disponível") return dspMatch.currentPrice;
-        
-        const firstAvailable = currentProduct.prices.find(p => p.stockStatus === "Disponível");
-        if (firstAvailable) return firstAvailable.currentPrice;
-        return currentProduct.basePrice || 25.00;
-      };
-
       cityData.pharmacies.forEach(ph => {
         const brand = PHARMACY_BRANDS[ph.id] || PHARMACY_BRANDS.default || { brandColor: "#dc2626", logoSvg: "" };
-        let currentPrice = 0;
-        let originalPrice = 0;
-        let hasDiscount = false;
-        let discountPercent = 0;
-        let stockStatus = "Disponível";
-
-        // Try to get real price from backend
-        const realPriceItem = !ph.isSimulated ? currentProduct.prices.find(p => p.pharmacyId === ph.id) : null;
-
-        if (realPriceItem) {
-          currentPrice = realPriceItem.currentPrice;
-          originalPrice = realPriceItem.originalPrice;
-          hasDiscount = realPriceItem.hasDiscount;
-          discountPercent = realPriceItem.discountPercent;
-          stockStatus = realPriceItem.stockStatus;
-        } else {
-          // Simulated/Local Price derived dynamically but deterministically based on EAN
-          const base = getBasePriceForQuery(ph);
-          const rand = seedRandom(currentProduct.barcode + ph.id);
-          const factor = ph.priceFactor || 1.0;
-          
-          currentPrice = parseFloat((base * factor * (0.97 + rand() * 0.05)).toFixed(2));
-          hasDiscount = rand() > 0.45;
-          discountPercent = hasDiscount ? Math.floor(rand() * 20 + 5) : 0;
-          originalPrice = hasDiscount ? parseFloat((currentPrice * (1 + (discountPercent/100))).toFixed(2)) : currentPrice;
-          stockStatus = "Disponível";
-        }
-
+        const prices = getPricesForPharmacy(ph);
         sortedPrices.push({
           pharmacyId: ph.id,
           pharmacyName: ph.name,
           address: ph.address,
           brandColor: brand.brandColor,
           logoSvg: brand.logoSvg,
-          currentPrice,
-          originalPrice,
-          hasDiscount,
-          discountPercent,
-          stockStatus,
+          distance: ph.distance,
           deliveryFee: ph.deliveryFee,
           deliveryTime: ph.deliveryTime,
-          distance: ph.distance,
-          buyUrl: `https://www.google.com/search?q=${encodeURIComponent(ph.name + ' ' + currentProduct.name)}`
+          buyUrl: `https://www.google.com/search?q=${encodeURIComponent(ph.name + ' ' + currentProduct.name)}`,
+          ...prices
         });
       });
     }
   }
 
-  // Update calculator state
+  // Save active list to displayedPrices for calculator calculations
   displayedPrices = [...sortedPrices];
-  
-  // Identify the absolute cheapest price to flag as Best Deal
-  // (Only count pharmacies that have stock)
+
+  // Identify lowest active price to display "Melhor Preço" badge
   let availablePrices = sortedPrices.filter(p => p.stockStatus === "Disponível");
   let lowestPrice = Infinity;
   
   if (availablePrices.length > 0) {
-    lowestPrice = Math.min(...availablePrices.map(p => p.currentPrice));
+    // For online mode, compare effectivePrice + effectiveDeliveryFee. For physical, compare effectivePrice
+    lowestPrice = Math.min(...availablePrices.map(p => p.effectivePrice + p.effectiveDeliveryFee));
   }
 
   // Sort prices based on selected filter
   if (currentSort === "price") {
-    // Sort ascending by price. Out of stock items pushed to end.
     sortedPrices.sort((a, b) => {
       if (a.stockStatus !== "Disponível" && b.stockStatus === "Disponível") return 1;
       if (a.stockStatus === "Disponível" && b.stockStatus !== "Disponível") return -1;
-      return a.currentPrice - b.currentPrice;
+      
+      const priceA = a.effectivePrice + a.effectiveDeliveryFee;
+      const priceB = b.effectivePrice + b.effectiveDeliveryFee;
+      return priceA - priceB;
     });
   } else if (currentSort === "distance") {
-    // Sort ascending by distance
     sortedPrices.sort((a, b) => a.distance - b.distance);
   } else if (currentSort === "delivery") {
-    // Sort by delivery time. E.g. "30 - 60 min". Take start duration
-    const parseTime = (timeStr) => {
-      const match = timeStr.match(/^(\d+)/);
-      return match ? parseInt(match[1]) : 999;
-    };
-    sortedPrices.sort((a, b) => parseTime(a.deliveryTime) - parseTime(b.deliveryTime));
+    if (purchaseMode === "online") {
+      const parseTime = (timeStr) => {
+        const match = timeStr.match(/^(\d+)/);
+        return match ? parseInt(match[1]) : 999;
+      };
+      sortedPrices.sort((a, b) => parseTime(a.deliveryTime) - parseTime(b.deliveryTime));
+    } else {
+      // In physical mode, closest distance acts as delivery time since pickup is immediate!
+      sortedPrices.sort((a, b) => a.distance - b.distance);
+    }
   }
-  
+
   sortedPrices.forEach(item => {
-    const isCheapest = item.stockStatus === "Disponível" && item.currentPrice === lowestPrice;
-    
+    const totalEffective = item.effectivePrice + item.effectiveDeliveryFee;
+    const isCheapest = item.stockStatus === "Disponível" && totalEffective === lowestPrice;
+
     const priceItem = document.createElement("div");
     priceItem.className = `price-item ${isCheapest ? "best-deal" : ""}`;
-    
-    const originalPriceHtml = item.hasDiscount 
-      ? `<span class="original-price">R$ ${item.originalPrice.toFixed(2).replace(".", ",")}</span>` 
+
+    const originalPriceHtml = item.hasDiscount && purchaseMode === "online"
+      ? `<span class="original-price" style="display:block;">R$ ${item.originalPrice.toFixed(2).replace(".", ",")}</span>`
       : "";
-      
-    const discountBadgeHtml = item.hasDiscount 
-      ? `<span class="discount-badge">-${item.discountPercent}%</span>` 
+
+    const discountBadgeHtml = item.hasDiscount && purchaseMode === "online"
+      ? `<span class="discount-badge">-${item.discountPercent}%</span>`
       : "";
-      
+
     const bestDealBadgeHtml = isCheapest 
       ? `<div class="best-deal-badge">Melhor Preço</div>` 
       : "";
 
-    priceItem.innerHTML = `
-      ${bestDealBadgeHtml}
-      <div class="pharmacy-logo" style="border-left: 4px solid ${item.brandColor}">
-        ${item.logoSvg}
-      </div>
-      <div class="pharmacy-details">
-        <span class="pharmacy-name">${item.pharmacyName}</span>
-        <span class="pharmacy-address">${item.address}</span>
+    // Shipping info representation
+    let shippingHtml = "";
+    if (purchaseMode === "online") {
+      shippingHtml = `
         <span class="pharmacy-shipping">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -482,10 +532,44 @@ function renderComparisonList() {
           </svg>
           Entrega em ${item.deliveryTime}
         </span>
+      `;
+    } else {
+      shippingHtml = `
+        <span class="pharmacy-shipping" style="color: var(--success); font-weight: 600;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
+            <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25s-7.5-4.108-7.5-11.25a7.5 7.5 0 1115 0z" />
+          </svg>
+          A ${item.distance} km de distância (Retirada Grátis)
+        </span>
+        <span class="pharmacy-shipping" style="margin-top: 4px;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          Pronto para retirada em 15 min
+        </span>
+      `;
+    }
+
+    priceItem.innerHTML = `
+      ${bestDealBadgeHtml}
+      <div class="pharmacy-logo" style="border-left: 4px solid ${item.brandColor}">
+        ${item.logoSvg}
+      </div>
+      <div class="pharmacy-details">
+        <span class="pharmacy-name">${item.pharmacyName}</span>
+        <span class="pharmacy-address">${item.address}</span>
+        ${shippingHtml}
       </div>
       <div class="price-section">
-        ${originalPriceHtml}
-        <span class="current-price">R$ ${item.currentPrice.toFixed(2).replace(".", ",")}</span>
+        <div class="price-row ${purchaseMode === 'online' ? 'active-mode' : ''}" title="Preço pelo Site">
+          <span class="price-label">🌐 Site</span>
+          <span class="price-value">R$ ${item.onlinePrice.toFixed(2).replace(".", ",")}</span>
+        </div>
+        <div class="price-row ${purchaseMode === 'presencial' ? 'active-mode' : ''}" title="Preço de Balcão Físico">
+          <span class="price-label">🚶 Loja</span>
+          <span class="price-value">R$ ${item.physicalPrice.toFixed(2).replace(".", ",")}</span>
+        </div>
         ${discountBadgeHtml}
       </div>
       <div class="action-section">
@@ -500,7 +584,7 @@ function renderComparisonList() {
         </a>
       </div>
     `;
-    
+
     container.appendChild(priceItem);
   });
 }
@@ -522,12 +606,12 @@ function updateCalculator() {
     return;
   }
   
-  const prices = availablePharmacies.map(p => p.currentPrice);
-  const minPrice = Math.min(...prices);
-  const maxPrice = Math.max(...prices);
+  const totals = availablePharmacies.map(p => p.effectivePrice + p.effectiveDeliveryFee);
+  const minTotal = Math.min(...totals);
+  const maxTotal = Math.max(...totals);
   
-  const totalPrice = minPrice * quantityMultiplier;
-  const potentialSavings = (maxPrice - minPrice) * quantityMultiplier;
+  const totalPrice = minTotal * quantityMultiplier;
+  const potentialSavings = (maxTotal - minTotal) * quantityMultiplier;
   
   document.getElementById("calc-total-price").textContent = `R$ ${totalPrice.toFixed(2).replace(".", ",")}`;
   document.getElementById("calc-savings").textContent = `R$ ${potentialSavings.toFixed(2).replace(".", ",")}`;

@@ -169,10 +169,18 @@
           <div>
             <div class="comparison-header">
               <h2>Comparativo de Preços</h2>
-              <div class="comparison-filters">
-                <button class="filter-btn active" data-sort="price">Menor Preço</button>
-                <button class="filter-btn" data-sort="distance">Mais Próxima</button>
-                <button class="filter-btn" data-sort="delivery">Entrega Rápida</button>
+              <div style="display: flex; gap: 16px; align-items: center; flex-wrap: wrap;">
+                <!-- Modalidade de Compra -->
+                <div class="mode-toggle-group">
+                  <button id="mode-online-btn" class="mode-btn active" data-mode="online">🌐 Online</button>
+                  <button id="mode-presencial-btn" class="mode-btn" data-mode="presencial">🚶 Presencial</button>
+                </div>
+                <!-- Ordenação -->
+                <div class="comparison-filters">
+                  <button class="filter-btn active" data-sort="price">Menor Preço</button>
+                  <button class="filter-btn" data-sort="distance">Mais Próxima</button>
+                  <button class="filter-btn" data-sort="delivery">Entrega Rápida</button>
+                </div>
               </div>
             </div>
 
