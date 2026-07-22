@@ -60,6 +60,35 @@ function extractActiveIngredient(product) {
   return "Princípio Ativo Não Especificado";
 }
 
+// Score a product's title matching quality for query string
+function scoreProduct(productName, query) {
+  const nameLower = productName.toLowerCase();
+  const queryLower = query.toLowerCase();
+  const queryWords = queryLower.split(/\s+/).filter(w => w.length > 0);
+  
+  if (nameLower === queryLower) return 1000;
+  
+  if (nameLower.includes(queryLower)) {
+    return 500 - (nameLower.length - queryLower.length);
+  }
+  
+  let wordsMatched = 0;
+  queryWords.forEach(word => {
+    if (nameLower.includes(word)) {
+      wordsMatched++;
+    }
+  });
+  
+  if (wordsMatched === 0) return 0;
+  
+  // If not all words match, penalize heavily
+  if (wordsMatched < queryWords.length) {
+    return wordsMatched * 10;
+  }
+  
+  return 100 + (wordsMatched * 20) - nameLower.length;
+}
+
 // Function to determine category from VTEX path or title
 function determineCategory(product) {
   if (product.categories && product.categories.length > 0) {
@@ -111,11 +140,30 @@ async function handleSearch(query, res) {
   keys.forEach((key, index) => {
     const res = results[index];
     if (res.success && Array.isArray(res.data) && res.data.length > 0) {
-      const product = res.data[0];
+      let product = res.data[0];
       
-      // Save the first successful product found as our base metadata template
+      // If it's a text search, score the items and choose the best match
+      if (!isBarcode) {
+        const scored = res.data.map(p => ({
+          p,
+          score: scoreProduct(p.productName, cleanQuery)
+        })).sort((a, b) => b.score - a.score);
+        
+        if (scored[0] && scored[0].score >= 20) {
+          product = scored[0].p;
+        }
+      }
+      
+      // Save the best successful product found as our base metadata template
       if (!baseProduct) {
         baseProduct = product;
+      } else if (!isBarcode) {
+        // If we already have a baseProduct, let's see if this chain's best product matches the query even better!
+        const existingScore = scoreProduct(baseProduct.productName, cleanQuery);
+        const currentScore = scoreProduct(product.productName, cleanQuery);
+        if (currentScore > existingScore) {
+          baseProduct = product; // Upgrade template to a better matches
+        }
       }
 
       const sku = product.items && product.items[0];
@@ -246,6 +294,36 @@ const server = http.createServer((req, res) => {
       return;
     }
     handleSearch(q, res);
+  } else if (parsedUrl.pathname === '/api/suggest') {
+    const q = parsedUrl.query.q || '';
+    if (!q || q.trim().length < 3) {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify([]));
+      return;
+    }
+    const cleanQuery = q.trim();
+    // Query Pague Menos search to get quick name and EAN suggestions
+    const url = `https://www.paguemenos.com.br/api/catalog_system/pub/products/search?ft=${encodeURIComponent(cleanQuery)}`;
+    fetchJSON(url).then(fetchRes => {
+      if (fetchRes.success && Array.isArray(fetchRes.data)) {
+        const suggestions = fetchRes.data.slice(0, 6).map(item => {
+          const sku = item.items && item.items[0];
+          return {
+            name: item.productName,
+            ean: sku ? sku.ean : null,
+            brand: item.brand
+          };
+        }).filter(item => item.name && item.ean);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(suggestions));
+      } else {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify([]));
+      }
+    }).catch(err => {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: err.message }));
+    });
   } else if (parsedUrl.pathname === '/api/shutdown') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ message: 'Server shutting down' }));

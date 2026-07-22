@@ -107,11 +107,13 @@
           </div>
           
           <form id="search-form" class="search-form" onsubmit="return false;">
-            <div class="input-group">
+            <div class="input-group" style="position: relative;">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.637 10.637z" />
               </svg>
               <input type="text" id="search-input" class="search-input" placeholder="Bipe o código ou digite o nome..." autofocus autocomplete="off">
+              <!-- Auto-complete Suggestions Dropdown -->
+              <div id="search-suggestions" class="suggestions-dropdown" style="display: none;"></div>
             </div>
             <button type="submit" id="search-btn" class="btn btn-primary">Buscar Produto</button>
           </form>

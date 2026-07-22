@@ -237,8 +237,79 @@ function initEventListeners() {
 
   // Auto-focus search input on page load
   const searchInput = document.getElementById("search-input");
+  const suggestionsDropdown = document.getElementById("search-suggestions");
+  
   if (searchInput) {
     searchInput.focus();
+
+    let debounceTimer = null;
+
+    searchInput.addEventListener("input", (e) => {
+      const query = e.target.value.trim();
+      clearTimeout(debounceTimer);
+
+      if (query.length < 3 || /^\d+$/.test(query)) {
+        if (suggestionsDropdown) suggestionsDropdown.style.display = "none";
+        return;
+      }
+
+      debounceTimer = setTimeout(async () => {
+        try {
+          const response = await fetch(`${BACKEND_URL}/api/suggest?q=${encodeURIComponent(query)}`);
+          if (!response.ok) throw new Error("Suggestion failed");
+          
+          const suggestions = await response.json();
+          renderSuggestions(suggestions);
+        } catch (err) {
+          console.warn("[Suggestions] Failed to load suggestions:", err.message);
+          if (suggestionsDropdown) suggestionsDropdown.style.display = "none";
+        }
+      }, 250);
+    });
+
+    // Close suggestions on clicking outside
+    document.addEventListener("click", (e) => {
+      if (suggestionsDropdown && !searchInput.contains(e.target) && !suggestionsDropdown.contains(e.target)) {
+        suggestionsDropdown.style.display = "none";
+      }
+    });
+
+    // Close suggestions on Escape key
+    searchInput.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && suggestionsDropdown) {
+        suggestionsDropdown.style.display = "none";
+      }
+    });
+  }
+
+  function renderSuggestions(suggestions) {
+    if (!suggestionsDropdown) return;
+    
+    if (!suggestions || suggestions.length === 0) {
+      suggestionsDropdown.style.display = "none";
+      return;
+    }
+    
+    suggestionsDropdown.innerHTML = "";
+    suggestionsDropdown.style.display = "flex";
+    
+    suggestions.forEach(item => {
+      const div = document.createElement("div");
+      div.className = "suggestion-item";
+      div.innerHTML = `
+        <span class="suggestion-name">${item.name}</span>
+        <span class="suggestion-brand-ean">
+          <span>🏷️ ${item.brand || 'Sem Marca'}</span>
+          <span>EAN: ${item.ean}</span>
+        </span>
+      `;
+      div.addEventListener("click", () => {
+        searchInput.value = item.name;
+        suggestionsDropdown.style.display = "none";
+        handleProductSearch(item.ean); // Directly search by the accurate EAN code
+      });
+      suggestionsDropdown.appendChild(div);
+    });
   }
 
   // Global keydown capture to refocus scanner input
@@ -266,9 +337,13 @@ async function handleProductSearch(query) {
 
   // Reset and refocus input so it's immediately ready for the next barcode bipe
   const searchInput = document.getElementById("search-input");
+  const suggestionsDropdown = document.getElementById("search-suggestions");
   if (searchInput) {
     searchInput.value = "";
     searchInput.focus();
+  }
+  if (suggestionsDropdown) {
+    suggestionsDropdown.style.display = "none";
   }
   
   const searchBtn = document.getElementById("search-btn");
