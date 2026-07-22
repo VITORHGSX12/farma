@@ -616,6 +616,14 @@ header {
   font-size: 1.05rem;
 }
 
+.pharmacy-address {
+  font-size: 0.8rem;
+  color: var(--text-light);
+  margin-top: 1px;
+  margin-bottom: 2px;
+  display: block;
+}
+
 .pharmacy-shipping {
   font-size: 0.8rem;
   color: var(--text-secondary);
