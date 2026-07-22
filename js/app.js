@@ -535,34 +535,39 @@ function updateCalculator() {
 
 // Check server connectivity and update status badge on load
 async function checkServerStatus() {
+  updateStatusBadge("waking");
   try {
     const response = await fetch(`${BACKEND_URL}/api/search?q=7891058017507`, {
       method: "GET",
-      signal: AbortSignal.timeout(3000) // 3 second timeout
+      signal: AbortSignal.timeout(60000) // Allow up to 60 seconds for Render free tier to wake up
     });
     if (response.ok) {
-      updateStatusBadge(true);
+      updateStatusBadge("online");
     } else {
-      updateStatusBadge(false);
+      updateStatusBadge("offline");
     }
   } catch (e) {
-    updateStatusBadge(false);
+    updateStatusBadge("offline");
   }
 }
 
 // Update DOM elements for server connection status
-function updateStatusBadge(isOnline) {
+function updateStatusBadge(status) {
   const badge = document.getElementById("server-status");
   if (!badge) return;
   
-  if (isOnline) {
+  if (status === "online" || status === true) {
     badge.textContent = "● Tempo Real";
     badge.className = "status-badge online";
     badge.title = "Conectado ao servidor de preços reais em tempo real.";
+  } else if (status === "waking") {
+    badge.textContent = "● Acordando Nuvem...";
+    badge.className = "status-badge waking";
+    badge.title = "O servidor na nuvem está iniciando (plano grátis). Isso leva de 40 a 50 segundos na primeira consulta após inatividade.";
   } else {
     badge.textContent = "● Modo Simulado";
     badge.className = "status-badge offline";
-    badge.title = "Servidor offline. Execute 'node server.js' para ativar preços reais.";
+    badge.title = "Servidor offline ou lento demais para responder. Preços gerados localmente.";
   }
 }
 
