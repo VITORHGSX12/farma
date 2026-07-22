@@ -99,44 +99,131 @@ header {
   border-bottom: 1px solid var(--border-glass);
 }
 
-.logo-section {
+/* Top Highlight Bar */
+.top-highlight-bar {
+  background: var(--bg-secondary);
+  border-bottom: 2px solid var(--primary);
+  color: var(--text-primary);
+  padding: 10px 24px;
+  font-size: 0.8rem;
+  font-weight: 700;
   display: flex;
+  justify-content: space-between;
   align-items: center;
-  gap: 12px;
+  box-shadow: var(--shadow-sm);
 }
 
-.logo-icon {
-  background: linear-gradient(135deg, var(--primary), var(--accent-teal));
-  width: 48px;
-  height: 48px;
-  border-radius: 14px;
+.top-bar-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.top-bar-right {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.top-bar-right strong {
+  color: var(--primary);
+  font-weight: 800;
+}
+
+.pulse-dot-green {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--success);
+  box-shadow: 0 0 8px var(--success);
+  animation: pulse-dot 1.5s infinite;
+}
+
+/* Custom Header Logo Section */
+.logo-section-custom {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.inova-logo-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.inova-icon-svg {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: white;
-  box-shadow: 0 4px 12px var(--primary-glow);
 }
 
-.logo-icon svg {
-  width: 24px;
-  height: 24px;
+.inova-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
 }
 
-.logo-section h1 {
-  font-size: 1.75rem;
-  background: linear-gradient(135deg, var(--text-primary), var(--primary));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  letter-spacing: -0.5px;
+.inova-title {
+  font-size: 0.9rem;
+  font-weight: 900;
+  font-style: italic;
+  color: var(--text-primary);
+  letter-spacing: 0.5px;
 }
 
-.logo-section span {
-  font-size: 0.8rem;
-  color: var(--accent-teal);
-  text-transform: uppercase;
-  font-weight: 800;
+.inova-title .red-text {
+  color: var(--primary);
+}
+
+.inova-subtitle {
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: var(--text-light);
   letter-spacing: 2px;
-  display: block;
+  margin-top: 1px;
+}
+
+.inova-slogan {
+  font-size: 0.55rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  font-style: italic;
+  margin-top: 2px;
+  border-top: 1px solid var(--border-glass);
+  padding-top: 1px;
+}
+
+.logo-divider {
+  width: 2px;
+  height: 42px;
+  background-color: var(--border-glass);
+  align-self: center;
+}
+
+.farma-luz-brand {
+  display: flex;
+  flex-direction: column;
+  line-height: 1;
+}
+
+.farma-luz-title {
+  font-size: 2.1rem;
+  font-weight: 900;
+  color: var(--primary);
+  font-family: 'Outfit', sans-serif;
+  letter-spacing: -0.5px;
+  margin: 0;
+}
+
+.farma-luz-location {
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: var(--text-light);
+  letter-spacing: 3.5px;
+  margin-top: 2px;
+  border-top: 1.5px solid var(--border-glass);
+  padding-top: 3px;
+  text-transform: uppercase;
 }
 
 .header-actions {
