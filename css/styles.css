@@ -839,3 +839,43 @@ header {
   flex-shrink: 0;
 }
 
+/* Scanner Ready Badge (Physical barcode reader pointer feedback) */
+.scanner-ready-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-glass);
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--accent-teal);
+  margin-bottom: 12px;
+}
+
+.scanner-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--accent-teal);
+  box-shadow: 0 0 8px var(--accent-teal);
+  animation: pulse-dot 1.5s infinite;
+}
+
+@keyframes pulse-dot {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(20, 184, 166, 0.7);
+  }
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 6px rgba(20, 184, 166, 0);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(20, 184, 166, 0);
+  }
+}
+

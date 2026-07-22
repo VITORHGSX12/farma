@@ -7,8 +7,6 @@ let currentSort = "price"; // "price" | "distance" | "delivery"
 let currentCity = "teresina"; // Selected city
 let displayedPrices = []; // List of prices currently displayed to calculate savings
 let quantityMultiplier = 1;
-let html5Qrcode = null;
-let isScanning = false;
 let recentScans = [];
 
 // Category SVGs to render product icons
@@ -158,10 +156,6 @@ function initEventListeners() {
   // Theme Toggle
   document.getElementById("theme-toggle").addEventListener("click", toggleTheme);
   
-  // Start/Stop Camera
-  document.getElementById("start-scan-btn").addEventListener("click", startScanning);
-  document.getElementById("stop-scan-btn").addEventListener("click", stopScanning);
-  
   // Search Form
   document.getElementById("search-form").addEventListener("submit", (e) => {
     e.preventDefault();
@@ -215,87 +209,42 @@ function initEventListeners() {
       }
     });
   }
-}
 
-// Barcode Scanning Logic
-function startScanning() {
-  if (isScanning) return;
-  
-  const startBtn = document.getElementById("start-scan-btn");
-  const stopBtn = document.getElementById("stop-scan-btn");
-  const wrapper = document.getElementById("scanner-wrapper");
-  const viewfinder = document.getElementById("viewfinder");
-  
-  startBtn.style.display = "none";
-  stopBtn.style.display = "flex";
-  wrapper.classList.add("scanning");
-  viewfinder.classList.add("active");
-  
-  isScanning = true;
-  
-  // Initialize standard scanning settings
-  html5Qrcode = new Html5Qrcode("camera-reader");
-  
-  const config = {
-    fps: 15,
-    qrbox: (width, height) => {
-      // Return a horizontal rectangle optimized for barcode layout
-      return {
-        width: Math.floor(width * 0.85),
-        height: Math.floor(height * 0.5)
-      };
-    },
-    aspectRatio: 1.333333 // 4:3
-  };
-
-  html5Qrcode.start(
-    { facingMode: "environment" }, // Prefer back camera
-    config,
-    (decodedText, decodedResult) => {
-      // Scanned successfully!
-      playBeep();
-      stopScanning();
-      handleProductSearch(decodedText);
-    },
-    (errorMessage) => {
-      // Normal scanning logs (very frequent, suppress to avoid console bloat)
-    }
-  ).catch(err => {
-    console.error("Erro ao iniciar a câmera:", err);
-    alert("Não foi possível acessar a câmera. Verifique as permissões do seu navegador.");
-    stopScanning();
-  });
-}
-
-function stopScanning() {
-  if (!isScanning) return;
-  
-  const startBtn = document.getElementById("start-scan-btn");
-  const stopBtn = document.getElementById("stop-scan-btn");
-  const wrapper = document.getElementById("scanner-wrapper");
-  const viewfinder = document.getElementById("viewfinder");
-  
-  startBtn.style.display = "flex";
-  stopBtn.style.display = "none";
-  wrapper.classList.remove("scanning");
-  viewfinder.classList.remove("active");
-  
-  isScanning = false;
-  
-  if (html5Qrcode) {
-    html5Qrcode.stop().then(() => {
-      html5Qrcode.clear();
-      html5Qrcode = null;
-    }).catch(err => {
-      console.error("Erro ao parar a câmera:", err);
-    });
+  // Auto-focus search input on page load
+  const searchInput = document.getElementById("search-input");
+  if (searchInput) {
+    searchInput.focus();
   }
+
+  // Global keydown capture to refocus scanner input
+  document.addEventListener("keydown", (e) => {
+    // Don't hijack keystrokes if operator is actively typing in a selector or multiplier input
+    const activeEl = document.activeElement;
+    const isInput = activeEl && (
+      activeEl.tagName === "SELECT" || 
+      activeEl.id === "qty-multiplier" ||
+      activeEl.tagName === "TEXTAREA"
+    );
+    
+    if (!isInput && searchInput && document.activeElement !== searchInput) {
+      searchInput.focus();
+    }
+  });
 }
 
 // Product Search & Fetch handler (Dynamic local server fetch with mock fallback)
 async function handleProductSearch(query) {
-  // Sync input field value
-  document.getElementById("search-input").value = query;
+  if (!query) return;
+
+  // Play audio confirmation beep
+  playBeep();
+
+  // Reset and refocus input so it's immediately ready for the next barcode bipe
+  const searchInput = document.getElementById("search-input");
+  if (searchInput) {
+    searchInput.value = "";
+    searchInput.focus();
+  }
   
   const searchBtn = document.getElementById("search-btn");
   const originalBtnText = searchBtn.textContent;
