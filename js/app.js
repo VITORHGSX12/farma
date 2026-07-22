@@ -1,5 +1,5 @@
 // Configuração do servidor backend (Altere para a URL da nuvem se for hospedado externamente, ex: https://farmacompare.onrender.com)
-const BACKEND_URL = "http://localhost:3000";
+const BACKEND_URL = "https://farma-7llj.onrender.com";
 
 // State variables
 let currentProduct = null;
