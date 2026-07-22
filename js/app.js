@@ -278,6 +278,17 @@ async function handleProductSearch(query) {
   searchBtn.disabled = true;
   searchBtn.textContent = "Buscando Preços Reais...";
 
+  // Prepare UI for loading
+  const skeleton = document.getElementById("loading-skeleton");
+  const listContainer = document.getElementById("price-comparison-list");
+  
+  // Show results panel immediately on first search to let the operator see the skeleton
+  document.getElementById("results-empty").style.display = "none";
+  document.getElementById("results-display").style.display = "flex";
+  
+  if (skeleton) skeleton.style.display = "flex";
+  if (listContainer) listContainer.style.display = "none";
+
   try {
     // Try to query the local proxy server or cloud backend
     const response = await fetch(`${BACKEND_URL}/api/search?q=${encodeURIComponent(query)}`);
@@ -305,8 +316,13 @@ async function handleProductSearch(query) {
       alert("Erro crítico: Banco de dados local indisponível.");
       searchBtn.disabled = false;
       searchBtn.textContent = originalBtnText;
+      if (skeleton) skeleton.style.display = "none";
       return;
     }
+  } finally {
+    // Hide skeleton and show actual comparison results
+    if (skeleton) skeleton.style.display = "none";
+    if (listContainer) listContainer.style.display = "flex";
   }
 
   // Restore button feedback
@@ -318,10 +334,6 @@ async function handleProductSearch(query) {
   renderProductDetails();
   renderComparisonList();
   updateCalculator();
-  
-  // Switch views
-  document.getElementById("results-empty").style.display = "none";
-  document.getElementById("results-display").style.display = "flex";
 }
 
 // Render product general cards
